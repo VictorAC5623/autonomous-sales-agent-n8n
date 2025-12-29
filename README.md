@@ -1,43 +1,56 @@
-# Autonomous Multi-Agent Sales Orchestrator 🤖
+# Autonomous Multi-Agent Sales Ecosystem 🤖
 
-A production-grade autonomous agent designed to automate the end-to-end sales process for an educational institution (*Preuniversitario Newman*). 
+**A production-grade autonomous sales orchestrator deployed in the education sector.**
 
-Unlike standard chatbots, this system acts as a **Sales Engineer**: it manages conversation state, retrieves context from a vector database, handles objections using Chain-of-Thought (CoT) reasoning, and autonomously decides when to close a sale or escalate to a human.
+This repository contains the source code for a modular AI system designed to automate end-to-end sales processes, moving beyond simple Q&A bots to a full "Sales Engineer" agent capable of context retention, objection handling, and autonomous closing.
 
-## 🏗 Architecture
+## 🏗 System Architecture
 
-The system is orchestrated via **n8n** and integrates the following stack:
+The ecosystem is built on a **Micro-Workflow Architecture** using **n8n** as the orchestrator. It integrates the following stack:
 
-* **Cognitive Engine:** Gemini 1.5 Pro (via API).
-* **State & Memory:** Google Firestore (NoSQL).
-* **Channel Interface:** WhatsApp Business API (via Chatwoot).
-* **Orchestrator:** Self-hosted n8n workflow.
+* **Cognitive Engine:** Gemini 1.5 Pro (via Google Vertex AI/Studio).
+* **State & Vector Store:** Google Firestore (NoSQL).
+* **Human Interface:** Chatwoot (Open Source CRM).
+* **Channel:** WhatsApp Business API (Meta).
 
-## 🧠 Workflow Logic
+## 🧩 Modules Overview
 
-The `sales_agent_workflow.json` contains the complete decision tree. Key logic blocks include:
+The system is composed of 4 synchronized workflows acting as independent services:
 
-1.  **Event Ingestion:** Webhook captures incoming messages from WhatsApp/Chatwoot.
-2.  **Context Retrieval (RAG):**
-    * Queries **Firestore** to retrieve the student's lead score and conversation history.
-    * Determines if the user is a returning lead ("Bumeran" logic).
-3.  **Cognitive Processing:**
-    * The LLM analyzes the intent.
-    * **Decision Node:** Determines if the lead is "Hot" (*Venta Caliente*).
-4.  **Action Execution:**
-    * **Sales Closing:** Sends payment links if the user is ready.
-    * **Objection Handling:** Uses a knowledge base to answer doubts about the curriculum.
-    * **Human Handoff:** If the sentiment is negative or complex, it tags the conversation as "Pending" in Chatwoot for human intervention.
+### 1. Core Agent (`sales_agent_workflow.json`)
+The central brain of the operation.
+* **Function:** Handles incoming messages, retrieves context (RAG) from Firestore, and uses Chain-of-Thought (CoT) prompting to decide the next best action.
+* **Key Logic:**
+    * **Intent Classification:** Distinguishes between "Hot Leads" (Purchase Intent > 85%) and general inquiries.
+    * **Dynamic RAG:** Pulls specific product data (Price, Curricula) based on user interest.
+    * **Personality Engine:** Switches between personas ("Santiago" vs "Sofía") based on user demographics.
 
-## 🚀 Deployment
+### 2. Human Bridge Middleware (`chatwoot_bridge.json`)
+A bi-directional synchronization layer between WhatsApp and Chatwoot.
+* **Function:** Ensures smooth "Human Handoff".
+* **Logic:** Filters bot-generated messages (marked with 🤖) to prevent loops and manages conversation status (Open/Pending) based on agent availability.
 
-1.  Install [n8n](https://n8n.io/).
-2.  Import the `sales_agent_workflow.json` file.
-3.  Configure your credentials for:
-    * Google Firestore (Service Account).
-    * Gemini API Key.
-    * Chatwoot API Token.
+### 3. The Hunter - Retention Loop (`retention_loop_hunter.json`)
+An asynchronous state machine for lead recovery.
+* **Function:** Monitors the `leads` collection in Firestore.
+* **Logic:** Runs a CRON job daily at 10:00 AM. Identifies leads stuck in "Pending" state for 48-90 hours and triggers a hyper-personalized re-engagement message to revive the sale.
 
-## 📂 File Structure
+### 4. Campaign Batch Launcher (`campaign_batch_launcher.json`)
+A batch-processing workflow for mass outreach.
+* **Function:** Reads leads from Google Sheets and executes messaging campaigns.
+* **Engineering:** Implements `SplitInBatches` logic (chunks of 500) to respect Meta API rate limits and logs delivery status/errors back to the database in real-time.
 
-* `sales_agent_workflow.json`: The core logic export from n8n.
+## 🚀 Key Technical Features
+
+* **State Management:** Unlike stateless LLM calls, this system maintains long-term memory of the user's journey in Firestore.
+* **Offline-First Data Sync:** Integrated with a custom Android Data Collection App (source in separate repo) to handle leads from physical trade fairs.
+* **Guardrails:** Includes strict prompt engineering to prevent hallucination and enforce business rules (e.g., "Never invent prices").
+
+## 🛠 Deployment
+
+1.  **Prerequisites:** Self-hosted n8n instance, Google Cloud Service Account (Firestore), and WhatsApp Business API credentials.
+2.  **Installation:** Import the `.json` files into n8n.
+3.  **Configuration:** Replace the placeholder credentials (`YOUR_API_KEY`, `YOUR_SHEET_ID`) with your production keys.
+
+---
+*Authored by **Victor Altamirano** - Physicist & AI Engineer*
