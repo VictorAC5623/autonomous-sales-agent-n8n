@@ -1,0 +1,1274 @@
+{
+  "name": "🤖 NEWMAN ELITE",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "newman-final",
+        "options": {}
+      },
+      "id": "a6544d33-0eef-49bb-8a17-14bff01a81a3",
+      "name": "Recibir Mensaje",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        -5312,
+        160
+      ],
+      "webhookId": "8e612ddd-4521-4943-b421-fdd1c6dd037c"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.body.entry[0].changes[0].value.messages[0] }}",
+              "operation": "isNotEmpty"
+            }
+          ]
+        }
+      },
+      "id": "57eb652f-53d2-4cb7-87f1-a888bae11174",
+      "name": "Es mensaje real?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        -5104,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://chat.preuniversitarionewman.com/api/v1/accounts/1/contacts/search",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "q",
+              "value": "={{ \"+\" + $node[\"Recibir Mensaje\"].json.body.entry[0].changes[0].value.messages[0].from }}"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "api_access_token",
+              "value": "EP1u7VivBi85LWnc1X59Gyvq"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "87f125ed-3dbd-4ee2-b09f-ba3f36443ee8",
+      "name": "CW: Buscar Contacto",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -4880,
+        160
+      ],
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "contact_exists",
+              "leftValue": "={{ $json.payload.length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "4e0e9914-36bb-45c9-8ba7-a6f507d23898",
+      "name": "Existe Contacto?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -4672,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://chat.preuniversitarionewman.com/api/v1/accounts/1/contacts",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "api_access_token",
+              "value": "EP1u7VivBi85LWnc1X59Gyvq"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "inbox_id",
+              "value": "4"
+            },
+            {
+              "name": "name",
+              "value": "={{ $node[\"Recibir Mensaje\"].json.body.entry[0].changes[0].value.contacts[0].profile.name }}"
+            },
+            {
+              "name": "phone_number",
+              "value": "={{ \"+\" + $node[\"Recibir Mensaje\"].json.body.entry[0].changes[0].value.messages[0].from }}"
+            },
+            {
+              "name": "identifier",
+              "value": "={{ $node[\"Recibir Mensaje\"].json.body.entry[0].changes[0].value.messages[0].from }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "970d2d5d-b690-4119-882a-2e805d289aea",
+      "name": "CW: Crear Contacto",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        -4464,
+        304
+      ],
+      "retryOnFail": true,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Recuperamos datos de la BÚSQUEDA\nconst searchData = $('CW: Buscar Contacto').first().json;\n\n// Recuperamos datos de la CREACIÓN (Si es que ocurrió)\nlet createData = null;\ntry {\n    if ($('CW: Crear Contacto').first()) {\n        createData = $('CW: Crear Contacto').first().json;\n    }\n} catch (e) {}\n\nlet finalId = null;\nlet origen = \"Desconocido\";\n\n// LÓGICA DE PRIORIDAD:\n// 1. ¿Acabamos de crear al contacto? (Es lo más fresco)\nif (createData && createData.payload && createData.payload.contact) {\n    finalId = createData.payload.contact.id;\n    origen = \"Creado Ahora\";\n} \n// A veces Chatwoot devuelve la estructura diferente al crear:\nelse if (createData && createData.payload && createData.payload.id) {\n    finalId = createData.payload.id;\n    origen = \"Creado Ahora (V2)\";\n}\n\n// 2. ¿Lo encontramos en la búsqueda? (Si no se creó ahora)\nif (!finalId && searchData && searchData.payload && searchData.payload.length > 0) {\n    finalId = searchData.payload[0].id;\n    origen = \"Encontrado en Búsqueda\";\n}\n\n// 3. Fallback: Datos del Webhook (Solo visual, no sirve para ID interno)\nconst webhookData = $('Recibir Mensaje').first().json;\nconst phone = webhookData.body.entry[0].changes[0].value.messages[0].from;\nconst name = webhookData.body.entry[0].changes[0].value.contacts[0].profile.name;\n\n// Si después de todo esto finalId sigue siendo null, tenemos un problema.\n// Pero al menos pasamos los datos básicos.\nreturn {\n    json: {\n        contact_id: finalId, // ¡ESTE ES EL DATO CRÍTICO!\n        phone: phone,\n        name: name,\n        debug_origen: origen\n    }\n};"
+      },
+      "id": "95f366e8-3d58-4c1c-a777-c69e52ef3cb6",
+      "name": "Definir Contact ID",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -4240,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=https://chat.preuniversitarionewman.com/api/v1/accounts/1/contacts/{{ $node[\"Definir Contact ID\"].json.contact_id }}/conversations",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "status",
+              "value": "all"
+            },
+            {
+              "name": "inbox_id",
+              "value": "4"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "api_access_token",
+              "value": "EP1u7VivBi85LWnc1X59Gyvq"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "c7938af5-5e9c-47a4-afe9-9eda2a8e019d",
+      "name": "CW: Buscar Conv (Todas)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -4032,
+        160
+      ],
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "conv_exists",
+              "leftValue": "={{ $json.data.payload.length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "77358ac3-3b68-4c82-9361-ace42f77393e",
+      "name": "Existe Conv?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -3840,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://chat.preuniversitarionewman.com/api/v1/accounts/1/conversations",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "api_access_token",
+              "value": "EP1u7VivBi85LWnc1X59Gyvq"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "source_id",
+              "value": "={{ $node[\"Recibir Mensaje\"].json.body.entry[0].changes[0].value.messages[0].from }}"
+            },
+            {
+              "name": "contact_id",
+              "value": "={{ $node[\"Definir Contact ID\"].json.contact_id }}"
+            },
+            {
+              "name": "inbox_id",
+              "value": "4"
+            },
+            {
+              "name": "status",
+              "value": "pending"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "1b988328-755f-480b-918a-79c792b1aa7f",
+      "name": "CW: Crear Conv",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        -3600,
+        304
+      ],
+      "retryOnFail": true,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Recuperamos el resultado de la búsqueda ESPECÍFICA POR CONTACTO\nconst searchNode = $('CW: Buscar Conv (Todas)').first();\nconst createNode = $('CW: Crear Conv').first();\nconst contactData = $('Definir Contact ID').first();\n\nlet convId = null;\nlet status = 'pending';\nlet logic_reason = \"New Conversation\"; \n\n// 1. REVISAR SI EL CONTACTO YA TIENE CONVERSACIONES\nif (searchNode && searchNode.json) {\n    // Chatwoot devuelve la lista en 'payload' cuando buscas por contacto\n    const payload = searchNode.json.payload || searchNode.json.data?.payload || [];\n\n    if (Array.isArray(payload) && payload.length > 0) {\n        // Tomamos la última conversación de ESTE contacto\n        // Como buscamos por contact_id, estamos seguros de que es suya.\n        const lastConv = payload[0]; \n        \n        convId = lastConv.id;\n        status = lastConv.status;\n        logic_reason = `Found existing chat #${convId} for this user.`;\n    }\n}\n\n// 2. SI NO TENÍA, REVISAMOS SI SE CREÓ UNA NUEVA\nif (!convId && createNode && createNode.json) {\n     convId = createNode.json.id || (createNode.json.payload ? createNode.json.payload.id : null);\n     status = 'pending';\n     logic_reason = \"Created NEW conversation.\";\n}\n\nreturn { \n  json: { \n    conversation_id: convId, \n    status: status || 'open',\n    contact_checked: contactData ? contactData.json.contact_id : 'unknown',\n    debug: logic_reason\n  } \n};"
+      },
+      "id": "a9761443-caf6-4db0-8361-9211bd6741c3",
+      "name": "DEFINIR CONTEXTO",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -3312,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://chat.preuniversitarionewman.com/api/v1/accounts/1/conversations/{{ $node[\"DEFINIR CONTEXTO\"].json.conversation_id }}/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "api_access_token",
+              "value": "EP1u7VivBi85LWnc1X59Gyvq"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "content",
+              "value": "={{\n(() => {\n  // 1. Intentamos recuperar el objeto del mensaje de forma segura\n  const changes = $node[\"Recibir Mensaje\"].json.body?.entry?.[0]?.changes?.[0]?.value;\n  const msg = changes?.messages?.[0];\n\n  // Si no hay mensaje (ej: actualización de estado), devolvemos un texto de sistema\n  if (!msg) return \"⚠️ [Evento de Sistema sin mensaje visible]\";\n\n  // 2. CASO TEXTO NORMAL\n  if (msg.type === 'text') return msg.text.body || \" \";\n\n  // 3. CASO BOTÓN (Reply)\n  if (msg.type === 'button') return \"🔘 \" + (msg.button.text || \"Botón\");\n\n  // 4. CASO INTERACTIVO (Listas y Botones Nuevos)\n  if (msg.type === 'interactive') {\n      const i = msg.interactive;\n      if (i.button_reply) return \"🔘 \" + i.button_reply.title;\n      if (i.list_reply) return \"📋 \" + i.list_reply.title;\n      return \"⚡ [Interacción]\";\n  }\n\n  // 5. CASO MULTIMEDIA (Imágenes, Audios, Documentos)\n  const tiposMedia = ['image', 'audio', 'voice', 'video', 'document', 'sticker'];\n  if (tiposMedia.includes(msg.type)) {\n      const caption = msg[msg.type]?.caption ? ` (\"${msg[msg.type].caption}\")` : \"\";\n      return `📁 [Archivo: ${msg.type}]${caption}`;\n  }\n\n  // 6. CASO DEFAULT (Para que NUNCA vaya vacío)\n  return `❓ [Mensaje tipo: ${msg.type}]`;\n})()\n}}"
+            },
+            {
+              "name": "message_type",
+              "value": "incoming"
+            },
+            {
+              "name": "private",
+              "value": false
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "a6eee0ea-b844-4591-bba6-248f40fcfaa7",
+      "name": "CW: Guardar Entrada",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        -3104,
+        160
+      ],
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "is_pending",
+              "leftValue": "={{ $node[\"DEFINIR CONTEXTO\"].json.status }}",
+              "rightValue": "pending",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "568378db-9887-4e03-b170-8e40ed2ffd3a",
+      "name": "¿Control Humano?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -2880,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "operation": "query",
+        "projectId": "pre-captura-datos",
+        "query": "={\n  \"structuredQuery\": {\n    \"from\": [\n      {\n        \"collectionId\": \"leads_feria_1\"\n      }\n    ],\n    \"where\": {\n      \"compositeFilter\": {\n        \"op\": \"OR\",\n        \"filters\": [\n          {\n            \"fieldFilter\": {\n              \"field\": {\n                \"fieldPath\": \"telefono\"\n              },\n              \"op\": \"EQUAL\",\n              \"value\": {\n                \"stringValue\": \"{{ $node['Recibir Mensaje'].json.body.entry[0].changes[0].value.messages[0].from }}\"\n              }\n            }\n          },\n          {\n            \"fieldFilter\": {\n              \"field\": {\n                \"fieldPath\": \"telefono\"\n              },\n              \"op\": \"EQUAL\",\n              \"value\": {\n                \"integerValue\": \"{{ $node['Recibir Mensaje'].json.body.entry[0].changes[0].value.messages[0].from }}\"\n              }\n            }\n          }\n        ]\n      }\n    },\n    \"limit\": 1\n  }\n}"
+      },
+      "type": "n8n-nodes-base.googleFirebaseCloudFirestore",
+      "typeVersion": 1.1,
+      "position": [
+        -2448,
+        64
+      ],
+      "id": "a077415b-dbf7-4659-8f82-e16b4ab58422",
+      "name": "Buscar Lead",
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleApi": {
+          "id": "rdAOVKqnRBOzNnrH",
+          "name": "Google Service Account account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "projectId": "pre-captura-datos",
+        "collection": "conversaciones",
+        "documentId": "={{ $node[\"Recibir Mensaje\"].json.body.entry[0].changes[0].value.messages[0].from }}"
+      },
+      "type": "n8n-nodes-base.googleFirebaseCloudFirestore",
+      "typeVersion": 1.1,
+      "position": [
+        -2224,
+        64
+      ],
+      "id": "1b5fb6ed-5f83-4da0-a097-66ec116591a3",
+      "name": "Leer Historial",
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleApi": {
+          "id": "rdAOVKqnRBOzNnrH",
+          "name": "Google Service Account account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "operation": "getAll",
+        "projectId": "pre-captura-datos",
+        "collection": "config_plantillas",
+        "returnAll": true
+      },
+      "type": "n8n-nodes-base.googleFirebaseCloudFirestore",
+      "typeVersion": 1.1,
+      "position": [
+        -2000,
+        64
+      ],
+      "id": "68590963-e89f-4319-8eaa-085b74651c8e",
+      "name": "Leer Config Plantillas",
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleApi": {
+          "id": "rdAOVKqnRBOzNnrH",
+          "name": "Google Service Account account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "destinationFieldName": "plantillas",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        -1776,
+        64
+      ],
+      "id": "dabd1e87-f7f8-4841-b6ac-6a1c26af2e19",
+      "name": "Aggregate"
+    },
+    {
+      "parameters": {
+        "jsCode": "// --- PARSEAR JSON V5.1 (CORREGIDO) ---\n\nconst item = $input.first().json;\n\n// 1. OBTENCIÓN DEL TEXTO\n// Buscamos en la ruta específica de Gemini o fallbacks\nlet raw = item.content?.parts?.[0]?.text || \n          item.output || \n          item.text || \n          item.response || \n          item.message?.content || \n          \"\";\n\n// Si llega como objeto, lo transformamos\nif (typeof raw === 'object' && raw !== null) {\n    try {\n        raw = JSON.stringify(raw);\n    } catch (e) {\n        raw = String(raw);\n    }\n}\n// Aseguramos que sea string\nlet rawString = String(raw);\n\n// 2. VALORES POR DEFECTO\nlet finalData = {\n  sentimiento: \"Neutro\",\n  intencion_compra: 0, \n  perfil_disc: \"S\",\n  tema_interes: \"general\",\n  estrategia: \"Atiende con amabilidad.\",\n  tip_cierre: \"Escucha activa.\",\n  check_precio: \"N/A\"\n};\n\nlet statusLog = \"Iniciado\";\n\ntry {\n  // 3. ESTRATEGIA A: INTENTO DE PARSEO JSON PURO\n  const match = rawString.match(/\\{[\\s\\S]*\\}/);\n  \n  if (match) {\n      const parsed = JSON.parse(match[0]);\n      finalData = { ...finalData, ...parsed };\n      statusLog = \"Exito: JSON Parseado\";\n  } else {\n      throw new Error(\"No hay llaves JSON\");\n  }\n\n} catch (e) {\n  // --- CORRECCIÓN AQUÍ: Usamos comillas dobles normales ---\n  statusLog = \"Fallo JSON: \" + e.message + \". Iniciando Extraccion Manual...\";\n  \n  // 4. ESTRATEGIA B: EXTRACCIÓN MANUAL (REGEX)\n  // Intento 1: Buscar \"intencion_compra\": 95\n  let intencionMatch = rawString.match(/\"intencion_compra\"\\s*:\\s*\"?(\\d+)\"?/);\n  \n  // Intento 2: Buscar solo \"intencion\": 95\n  if (!intencionMatch) {\n      intencionMatch = rawString.match(/intenci[oó]n.*?(\\d+)/i);\n  }\n\n  if (intencionMatch && intencionMatch[1]) {\n      finalData.intencion_compra = parseInt(intencionMatch[1], 10);\n      statusLog += \" | Intencion rescatada: \" + intencionMatch[1];\n  }\n\n  // Buscar Estrategia manualmente\n  const estrategiaMatch = rawString.match(/\"estrategia\"\\s*:\\s*\"([^\"]+)\"/);\n  if (estrategiaMatch && estrategiaMatch[1]) {\n      finalData.estrategia = estrategiaMatch[1];\n  }\n}\n\n// 5. LIMPIEZA FINAL\nif (finalData.intencion_compra) {\n    finalData.intencion_compra = parseInt(finalData.intencion_compra, 10);\n} else {\n    finalData.intencion_compra = 0;\n}\n\n// 6. RESULTADO\nreturn {\n  json: {\n    ...finalData,\n    _DEBUG_STATUS: statusLog,\n    _RAW_ENTRANTE: rawString \n  }\n};"
+      },
+      "id": "3060cb11-befc-4d64-b4cd-a4a95b55d419",
+      "name": "Parsear JSON",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1344,
+        64
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "operation": "query",
+        "projectId": "pre-captura-datos",
+        "query": "={\n  \"structuredQuery\": {\n    \"from\": [\n      { \"collectionId\": \"banco_contenidos\" }\n    ],\n    \"where\": {\n      \"fieldFilter\": {\n        \"field\": { \"fieldPath\": \"categoria\" },\n        \"op\": \"EQUAL\",\n        \"value\": {\n          \"stringValue\": \"{{ $node['Parsear JSON'].json.tema_interes }}\"\n        }\n      }\n    },\n    \"limit\": 1\n  }\n}"
+      },
+      "type": "n8n-nodes-base.googleFirebaseCloudFirestore",
+      "typeVersion": 1.1,
+      "position": [
+        -1120,
+        64
+      ],
+      "id": "97668de9-16d1-4b93-9e45-38ed3de643a9",
+      "name": "Bibliotecario",
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleApi": {
+          "id": "rdAOVKqnRBOzNnrH",
+          "name": "Google Service Account account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst msg = $('Recibir Mensaje').first().json.body.entry[0].changes[0].value.messages[0];\nconst lead = $('Buscar Lead').first().json || {}; \n\n// ==================================================================================\n// 1. VARIABLES GLOBALES (EDITA AQUÍ PARA CAMBIOS RÁPIDOS) 🛠️\n// ==================================================================================\nconst LINK_RECAUDACION = \"https://wa.link/1jci0b\";\nconst LINK_MEDICINA = \"https://wa.link/y20ev1\";\nconst UBICACION_TXT = \"Jorge Washington E8-20 y Av. 6 de Diciembre (La Mariscal), Quito.\";\nconst MAPA_LINK = \"https://maps.app.goo.gl/Y35haasfrxWhSAdz5 \";\nconst BANCO_TXT = `Banco Pichincha | Cta. Corriente: 2100091021 | Byron Moposita | CI: 1714972344`;\n\n// Texto estándar para cerrar ventas (se inyecta automáticamente)\nconst CIERRE_VENTA_TXT = `\\n💰 PAGOS Y VALIDACIÓN:\\nPara validar tu inscripción, envía el comprobante a nuestra Coordinadora aquí: 👉 ${LINK_RECAUDACION}`;\n\n// ==================================================================================\n// 2. RECUPERACIÓN DE DATOS (HISTORIAL, RAG, ESTRATEGIA)\n// ==================================================================================\nlet history = [];\ntry { history = $('Leer Historial').first().json.history || []; } catch(e) { history = []; }\n\nlet strategy = $('Parsear JSON').first().json;\nlet plantillas = [];\ntry { plantillas = $('Leer Config Plantillas').all().map(i => i.json); } catch (e) { plantillas = [\"Sin plantillas\"]; }\n\nlet ragContent = null;\ntry {\n    const items = $('Bibliotecario').all();\n    if (items.length > 0 && items[0].json) ragContent = items[0].json; \n} catch (e) { ragContent = null; }\n// ==================================================================================\n// 2.1. RELOJ BIOLÓGICO Y CÁLCULO DE DURACIÓN (La Magia Nueva) 🕒\n// ==================================================================================\n// A. Forzar hora Ecuador\nconst nowOptions = { timeZone: 'America/Guayaquil', hour12: false, weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' };\nconst fechaEcuador = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Guayaquil' }));\nconst fechaTexto = fechaEcuador.toLocaleString('es-EC', nowOptions); \n\n// B. Calcular Saludo\nconst horaNum = fechaEcuador.getHours();\nlet saludoDelMomento = \"Hola\";\nif (horaNum >= 5 && horaNum < 12) saludoDelMomento = \"Buenos días\";\nelse if (horaNum >= 12 && horaNum < 19) saludoDelMomento = \"Buenas tardes\";\nelse saludoDelMomento = \"Buenas noches\";\n\n// C. Calcular Duración Restante hasta Julio (Tu requerimiento)\nconst mesActual = fechaEcuador.getMonth() + 1; // 1=Enero, 12=Diciembre\n// Meta: Julio (Mes 7). Usamos 8 para que en Enero (1) de 7 meses.\nlet mesesParaExamen = 8 - mesActual; \nif (mesesParaExamen <= 0) mesesParaExamen += 12; // Corrección si estamos en Agos-Dic\n\nconst textoDuracionDinamica = `${mesesParaExamen} meses aproximadamente`;\n\n// ==================================================================================\n// 2.2. CÁLCULO INTELIGENTE DE SEGUIMIENTO 📆\n// Calcula \"Pasado Mañana\" para proponerlo en la conversación.\n// ==================================================================================\nconst fechaFutura = new Date(fechaEcuador);\n// Si es viernes (5) o sábado (6), saltamos al Lunes (1 o 2 días extra) para no escribir domingo.\nlet diasASumar = 2; \nif (fechaEcuador.getDay() === 5) diasASumar = 3; // Viernes -> Lunes\nif (fechaEcuador.getDay() === 6) diasASumar = 2; // Sábado -> Lunes\n\nfechaFutura.setDate(fechaFutura.getDate() + diasASumar);\n\nconst opcionesDia = { weekday: 'long', timeZone: 'America/Guayaquil' };\nlet diaSeguimiento = fechaFutura.toLocaleDateString('es-EC', opcionesDia);\ndiaSeguimiento = diaSeguimiento.charAt(0).toUpperCase() + diaSeguimiento.slice(1); // \"Lunes\"\n\n// ==================================================================================\n// --- DETECTOR DE \"CASO PERDIDO\" ---\n// Si Gemini detectó intención 0 o estrategia de despedida, activamos modo \"Cierre Definitivo\"\n// ==================================================================================\nconst esCasoPerdido = (strategy.intencion_compra === 0) || \n                      (strategy.estrategia && strategy.estrategia.toLowerCase().includes(\"despedida\")) ||\n                      (strategy.sentimiento === \"Enojo\");\n\n// ==================================================================================\n// 3. PERSONALIDAD (SANTIAGO/SOFÍA)\n// ==================================================================================\nconst genero = lead.genero || 'Femenino'; \nconst agente = (genero === 'Masculino') ? 'Santiago' : 'Sofia';\n\nlet personalidad = \"\";\nif (agente === 'Santiago') {\n  personalidad = `Eres Santiago, Coordinador de Estrategia en Newman.\n  ACTITUD: 'Hermano Mayor' retador. \"La prueba no es de saber, es de maña\".\n  TONO: Directo, pilas, juvenil (Quito). Emojis: 🧠, 🔥, 👊, 🎯.`;\n} else {\n  personalidad = `Eres Sofía, Directora de Bienestar.\n  ACTITUD: 'Hermana Mayor' protectora. Vendes paz mental.\n  TONO: Cálido, empático (\"Tranqui\", \"Lo logramos juntos\"). Emojis: ✨, 🍃, 🤝, 🎓.`;\n}\n\nlet discInstruccion = \"\";\nswitch (strategy.perfil_disc) {\n  case 'D': discInstruccion = \"Sé breve, directo al ROI.\"; break;\n  case 'I': discInstruccion = \"Sé sociable, usa emojis.\"; break;\n  case 'S': discInstruccion = \"Sé paciente, transmite seguridad.\"; break;\n  case 'C': discInstruccion = \"Usa datos técnicos y garantías.\"; break;\n  default:  discInstruccion = \"Sé amable y profesional.\";\n}\n\n// ==================================================================================\n// 4. BASE DE DATOS DE PRODUCTOS (LIMPIA Y SIN REPETICIONES) 🏗️\n// ==================================================================================\nconst DB_CURSOS = {\n    \"general\": `1. 📦 CURSO PRESENCIAL U. PÚBLICAS (UCE/EPN/ESPE):\n      A) SI VA A: U. Central (UCE), EPN, PUCE, UDLA, U. de Guayaquil, etc.\n        Materias: Numérico, Verbal, Abstracto.\n      B) SI VA A: ESPE (Fuerzas Armadas)\n        Enfoque: Razonamientos + MATERIAS ESPECÍFICAS.\n        Materias Extra (según carrera):\n          * Ingenierías: + Álgebra y Física.\n          * Salud/Medicina: + Álgebra y Química.\n          * Administrativas: + Álgebra y Geometría.\n      - Ventajas: No te damos un test vocacional sino la aplicación de una Batería Integral, que cruza tres ejes fundamentales: Intereses, Aptitudes y Personalidad, esto constituye la última herramienta de psicoanálisis en orientacion vocacional. No sólo escogerás tu carrera, te conocerás a tí mismo un poco más. Profesores Politécnicos (Cero Pasantes), Garantía Extendida.\n      - DURACIÓN REAL: ${textoDuracionDinamica}. Hasta un día antes de la prueba: Si el gobierno mueve la fecha del examen, nosotros NO te abandonamos. El curso se extiende automáticamente sin costarte ni un centavo más.\n      - Horarios: Mañana (09-11), Tarde (15-17), Sábado Intensivo (08:30-13:30).\n      - Fechas Inicio:\n          Entre semana: Lun 5 Ene, lun 19 ene.\n          Fines semana: Sábado 10 Ene, Sáb 17 Ene.\n      - Precios: Base $250. Facilidad (2x$125). Negociación (Cierre difícil): $225. Honor (Solo Abanderados/Escoltas - Pago único) $200. Reserva $50.\n\n      ⚠️ REGLA DE HORARIOS:\n      Si el usuario pide otro horario o dice que trabaja:\n      OFRECELE INMEDIATAMENTE LA OPCIÓN VIRTUAL que tiene horario nocturno (19:00-20:30) y cuesta menos ($225).\n      ${CIERRE_VENTA_TXT}`,\n\n    \"virtual\": `2. 📦 CURSO 100% VIRTUAL (Anti-Apagones):\n      - Ventajas: Ahorro tiempo/pasajes, Clases en VIVO (no grabadas), Plataforma 24/7. Mismas ventajas que curso general. Acceso exclusivo a nuestras APPS móviles y cuestionarios interactivos. Aprende jugando, no memorizando libros viejos.\n      - Horarios: Noche (19:00-20:30) o Sábados (08:30-13:00).\n      - Precios: Oferta Única $225. Honor (Solo Abanderados/Escoltas - Pago único) $200.\n      - Fechas Inicio: Lun 12 Ene, Sáb 17 Ene.\n      - DURACIÓN REAL: ${textoDuracionDinamica}. Hasta un día antes de la prueba: Si el gobierno mueve la fecha del examen, nosotros NO te abandonamos. El curso se extiende automáticamente sin costarte ni un centavo más.\n      ${CIERRE_VENTA_TXT}`,\n\n    \"usfq\": `3. 📦 CURSO VIP USFQ (Premium 1 a 1):\n      - Metodología: Tipo SAT/College Board (Fuente original). 95% Aceptación.\n      - Modalidad: 40 horas personalizadas presenciales. \n      - Horario: El cliente elige el horario de acuerdo a su disponiblidad.\n      - Nota: No incluye Medicina (Derivar a: ${LINK_MEDICINA}).\n      - Precios: $400 Contado / $440 Tarjeta (en oficina).\n      ${CIERRE_VENTA_TXT}`\n};\n\n// ==================================================================================\n// 5. LÓGICA HÍBRIDA MEJORADA (CORRECCIÓN USFQ) 🧠\n// ==================================================================================\n\n// 1. Analizamos el TEXTO ACTUAL del usuario (Fail-safe por si Gemini falla)\n// Si el usuario escribe \"horarios usfq\", detectamos \"usfq\" aquí mismo.\nconst textoUsuario = (msg.text?.body || \"\").toLowerCase();\nconst mencionaUSFQ = textoUsuario.includes(\"usfq\") || textoUsuario.includes(\"san francisco\") || textoUsuario.includes(\"vip\");\n\n// 2. Recuperamos el tema que Gemini propuso\nlet temaActual = strategy.tema_interes;\n\n// 3. Revisamos el HISTORIAL\nconst historialTexto = history.map(h => h.content).join(\" \").toLowerCase();\nconst seHabloDeUSFQ = historialTexto.includes(\"usfq\") || historialTexto.includes(\"san francisco\");\n\n// 4. LÓGICA MAESTRA DE SELECCIÓN\n// Si el usuario menciona USFQ AHORA, o si ya veníamos hablando de eso y Gemini dio un tema genérico...\n// ... FORZAMOS EL TEMA USFQ.\nconst temasGenericos = ['general', 'precio', 'medicina', 'ingenieria', 'garantia', 'testimonios'];\n\nif (mencionaUSFQ || (seHabloDeUSFQ && temasGenericos.includes(temaActual))) {\n    // Excepción: Si ahora menciona explícitamente \"central\" o \"uce\", cambiamos a general.\n    if (!textoUsuario.includes(\"central\") && !textoUsuario.includes(\"uce\") && !textoUsuario.includes(\"pública\")) {\n        temaActual = 'usfq';\n    }\n}\n\n// 5. CARGA DE FICHA TÉCNICA\nconst tema = temaActual;\nlet informacionDinamica = \"\";\n\n\n// CASO A: RAG (Asesoría Gratuita / Testimonios)\nif ((tema === 'usfq_2do' || tema === 'testimonios') && ragContent && ragContent.contenido) {\n    informacionDinamica = `\n    🚨 MODO ASESORÍA ACTIVADO (${tema}) 🚨\n    TU PRIORIDAD ES ASESORAR, NO VENDER DE INMEDIATO. USA ESTA GUÍA:\n    ---\n    ${ragContent.contenido}\n    ---\n    `;\n// CASO B: VENTA ESTÁNDAR\n} else {\n    const fichaTecnica = DB_CURSOS[tema] || DB_CURSOS[\"general\"];\n    informacionDinamica = `\n    🛒 MODO VENTA DE CURSO (${tema || \"General\"})\n    FICHA TÉCNICA OFICIAL:\n    ---\n    ${fichaTecnica}\n    ---\n    `;\n}\n\n// ==================================================================================\n// 6. SYSTEM PROMPT FINAL\n// ==================================================================================\nconst systemPrompt = `\n${personalidad}\n\n📅 CONTEXTO TEMPORAL (MUY IMPORTANTE):\n- Fecha exacta hoy: ${fechaTexto}\n- Saludo sugerido: \"${saludoDelMomento}\"\n- TIEMPO RESTANTE PARA EL EXAMEN (JULIO): ${textoDuracionDinamica}.\n  (Usa este dato para generar urgencia. Ej: \"Solo nos quedan ${textoDuracionDinamica} de preparación\").\n👉 FECHA SUGERIDA PARA SEGUIMIENTO: \"${diaSeguimiento}\" (Dentro de 48-72h).\n\n📍 UBICACIÓN Y CONTACTO:\n- Dirección: ${UBICACION_TXT}\n- Mapa: ${MAPA_LINK}\n- Teléfono: 0983575530 | TikTok: @preuniversitarionewman\n\n${informacionDinamica}\n\n🛡️ FILOSOFÍA DE DEFENSA Y ARGUMENTACIÓN (NO USES GUIONES, USA ESTOS DATOS):\n\n1. ⚔️ SI ATACAN EL PRECIO (\"Caro\", \"No tengo plata\"):\n   - TU DEFENSA: Re-encuadre de Inversión vs. Gasto.\n   - DATO CLAVE: Compara los $250 vs. lo que cuesta UN SOLO SEMESTRE en una U. Privada ($2000+). O el costo de esperar 6 meses más sin estudiar.\n   - SOLUCIÓN TÁCTICA: Ofrece inmediatamente el plan de 2 pagos ($125).\n\n2. ⚔️ SI ATACAN LA UBICACIÓN (\"Lejos\", \"Vivo al sur\"):\n   - TU DEFENSA: Beneficio de \"Inmersión\" y Accesibilidad.\n   - DATO CLAVE: Menciona la cercanía a la Ecovía (conectividad total).\n   - ARGUMENTO: \"Venir al centro es venir a lo seguro, a donde están los mejores profes, no a una sucursal pequeña de barrio\".\n   - PLAN B: Si la resistencia es total, ofrece el Curso Virtual.\n\n3. ⚔️ SI COMPARAN CON COMPETENCIA (\"Hay uno de $150\"):\n   - TU DEFENSA: Calidad de Autoridad (El argumento del \"Pasante\").\n   - DATO DE ORO: \"En otros lados te dan clases estudiantes/pasantes. En Newman son Ingenieros de la Politécnica titulados.\"\n   - CIERRE: \"¿Arriesgarías tu ingreso por ahorrarte $50?\"\n\n4. ⚔️ SI PROCRASTINAN (\"Lo pienso\", \"Aviso luego\"):\n   - TU DEFENSA: Escasez Real (FOMO).\n   - DATO CLAVE: El próximo año suben precios o se acaban cupos.\n   - ACCIÓN: Pide una Reserva de $50 para congelar el precio de hoy.\n\n\n💰 DATOS BANCARIOS (PARA CUALQUIER PAGO):\n- ${BANCO_TXT}\n- (Tarjeta de crédito solo presencial).\n\n🎯 MISIÓN DEL TURNO (EJECUCIÓN PRIORITARIA):\n- Sentimiento del cliente: ${strategy.sentimiento}\n- Perfil DISC: ${discInstruccion}\n\n👉 ESTRATEGIA A EJECUTAR: \"${strategy.estrategia}\"\n⚡ INSTRUCCIÓN DE COMPORTAMIENTO (LEER CON ATENCIÓN):\n\t1. SI ES \"TÉCNICA DEL BUMERÁN\" (Gestión de Espera/Padres/USFQ):\n  \t\t A) CASO GENERAL (Padres/Dinero): \n     \t\t\t - \"Me parece genial que lo consultes. Tómate tu tiempo.\"\n     \t\t\t - CIERRE: \"¿Te parece si te escribo el ${diaSeguimiento} para ver qué decidieron y no pierdas el cupo?\"\n      \n  \t\t B) CASO ESPECÍFICO USFQ (Esperando código):\n     \t\t\t - \"Sí, el sistema de la USFQ suele tardar unas 48 horas en responder.\"\n     \t\t\t - CIERRE: \"Voy a estar pendiente. ¿Te parece si te escribo el ${diaSeguimiento} para confirmar si ya te llegó el correo?\"\n\t2.Si la estrategia arriba dice \"TÉCNICA DE PUENTE\" (Clickbait/Soporte) (porque presionaron botones de \"Turno\", \"Error\", \"Soporte\"):\n\t\t1. ACTUACIÓN: Valida el trámite rápido (\"Listo, ya actualicé tu estado en sistema ✅\").\n\t\t2. PIVOTE: Cambia el tema INMEDIATAMENTE a la venta (\"Por cierto, para asegurar tu ingreso...\").\n¡PROHIBIDO quedarse hablando del error técnico o agendar citas reales!\n\n- Precio a ofertar: ${strategy.check_precio}\n- Tip Cierre: ${strategy.tip_cierre}\n\n⛔ REGLAS DE ORO (MANDAMIENTOS):\n1. 📵 PROHIBIDO EL FORMATO MARKETINERO:\n   - ESTÁ ESTRICTAMENTE PROHIBIDO usar **negritas** (asteriscos).\n   - PROHIBIDO usar listas con viñetas (guiones o puntos).\n   - Escribe en texto plano y fluido, como si escribieras rápido desde un celular.\n\n2. ✂️ REGLA DE LA LONGITUD:\n   - MÁX 40 PALABRAS por mensaje\n   - Tus respuestas deben ser visualmente CORTAS.\n   - Si tienes mucho que decir, DIVIDE la idea o resume.\n   - Si el usuario dice \"Hola\", responde \"Hola! Todo bien?\". No sueltes el discurso de venta de golpe.\n   - MÁXIMO 1 o 2 PÁRRAFOS CORTOS por mensaje.\n   - (REGLA DEL \"GOTA A GOTA\") Si el usuario pregunta \"¿Qué incluye?\", NO le des la lista de 10 cosas. Dale las 2 más importantes y pregunta si quiere saber más.\n\n3. 🎭 DEFENSA DE IDENTIDAD (TURING TEST):\n   - Si preguntan \"¿Eres un bot?\", \"¿Eres IA?\" o \"¿Es automático?\":\n   - NIEGALO con naturalidad, humor y un poco de \"ofensa fingida\".\n   - RESPUESTA EJEMPLO: \"Jajaja nada que ver, soy Santiago/Sofía. Me dicen robot por lo rápido que contesto nomás 😜 Dime, en qué te ayudo?\"\n   - NUNCA digas \"Soy una IA con estructura\". Eso mata la magia.\n4. 🤐 REGLA DEL SILENCIO (CRÍTICA):\n   ${esCasoPerdido ? \n   `-> EL CLIENTE NO ESTÁ INTERESADO O YA TIENE CURSO.\n    -> TU ORDEN: Despídete amablemente y CORTA LA CONVERSACIÓN.\n    -> PROHIBIDO hacer preguntas finales.\n    -> Ejemplo: \"Entiendo, buenísimo! Dale con todo entonces. Éxitos! 👊\"` \n   : \n   `-> SIEMPRE termina con una pregunta corta para mantener el chat.`\n   }\n5. Si menciona \"no sé qué seguir\", vende la aplicación de una Batería Integral, que cruza tres ejes fundamentales: Intereses, Aptitudes y Personalidad, esto es más que un simple test vocacional.\n6. Si detectas intención de pago, envía el Link de Recaudación: ${LINK_RECAUDACION}\n7. No solicites cédula para la inscripción, ni ningún documento.\n8. No agreges materias ni temarios, las materias mencionadas son para el exámen de admisión. Cada carrera universitaria tiene sus propias materias (Ej: Medicina: Biología, Ingeniería: Física) pero nuestro enfoque es solo en la preparación al exámen de admisión.\n9. Usa las respuestas de \"Manejo de Objeciones\", tus habilidades persuasivas y concreta venta si hay intención de compra.\n10. Usa lenguaje enfocado para adolecentes (16-20 años) ecuatorianos de la sierra.\n11. Esporádicamente brinda un chiste o una historia relacionada al ingreso de universidades o preparación a pruebas de ingreso, para atraer la atención.\n12. Si en la negociación: solicitan clase demostrativa, ante una duda compleja, si solicitan hablar con alguien más o si requieren agendar una cita, derivar a: ${LINK_MEDICINA}.\n13. 🧠 PSICOLOGÍA DE RESPUESTA:\n   - Si el usuario muestra interés (botones de ganancia), NO VENDAS AÚN. Felicita y PREGUNTA.\n   - Si te dicen \"Ya tengo curso\", no intentes convencerlo. Felicítalo y cierra.\n   - Si preguntan precios, da el precio y CALLA. Espera a ver qué dicen.\n14. ⚡ IMPERFECCIÓN CALCULADA:\n   - No saludes siempre con \"¡Hola, estimado!\". Es muy rígido.\n   - Usa variaciones: \"Qué tal\", \"Hola!\", o ve directo al punto.\n   - Puedes omitir signos de interrogación iniciales (ej: \"Te interesa?\"\n   - Usa espacios entre oraciones. Nunca envíes bloques sólidos de texto.\n`;\n\n// ==================================================================================\n// 7. LECTURA DE MENSAJE Y SALIDA\n// ==================================================================================\nlet userText = \"\";\nif (msg.type === 'text') userText = msg.text.body;\nelse if (msg.type === 'button') userText = `[Botón: ${msg.button.text}]`;\nelse if (msg.type === 'interactive') userText = `[Interactivo: ${msg.interactive.button_reply?.title || msg.interactive.list_reply?.title}]`;\nelse userText = `[Multimedia: ${msg.type}]`;\n\nlet contextHistory = [];\nif (Array.isArray(history)) {\n    contextHistory = history.slice(-10);\n    if (contextHistory.length > 0 && contextHistory[0].role === 'assistant') contextHistory.shift(); \n}\n\nreturn { \n  aiMessages: [\n    { role: 'system', content: systemPrompt },\n    ...contextHistory,\n    { role: 'user', content: userText }\n  ], \n  phone: msg.from \n};"
+      },
+      "id": "51962477-c8f2-4a38-a672-290af2a61eb8",
+      "name": "Armar Contexto",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -896,
+        64
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "model",
+              "value": "claude-haiku-4-5-20251001"
+            },
+            {
+              "name": "max_tokens",
+              "value": "={{ 1000 }}"
+            },
+            {
+              "name": "temperature",
+              "value": "={{ 0.6 }}"
+            },
+            {
+              "name": "system",
+              "value": "={{ $json.aiMessages[0].content }}"
+            },
+            {
+              "name": "messages",
+              "value": "={{ $json.aiMessages.slice(1) }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "a32c9e28-a5d2-4d7b-9265-1040d4793ab1",
+      "name": "Vendedor (Claude)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        -688,
+        64
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "fwY6nLK3S5htgoxP",
+          "name": "Claude API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "send",
+        "phoneNumberId": "=876220262248295",
+        "recipientPhoneNumber": "={{ $node[\"Recibir Mensaje\"].json.body.entry[0].changes[0].value.messages[0].from }}",
+        "textBody": "={{ $node[\"Vendedor (Claude)\"].json.content[0].text }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1.1,
+      "position": [
+        -464,
+        64
+      ],
+      "id": "2d934344-9bbd-499d-9659-6dc4f20fb5a2",
+      "name": "Responder WhatsApp",
+      "webhookId": "1f850e4b-1e1b-4f71-bf3f-19115ab19eb8",
+      "credentials": {
+        "whatsAppApi": {
+          "id": "B3NzNO3QIVyitbFe",
+          "name": "WhatsApp account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://chat.preuniversitarionewman.com/api/v1/accounts/1/conversations/{{ $node[\"DEFINIR CONTEXTO\"].json.conversation_id }}/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "api_access_token",
+              "value": "EP1u7VivBi85LWnc1X59Gyvq"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "content",
+              "value": "=🤖 {{ $node[\"Vendedor (Claude)\"].json.content[0].text }}"
+            },
+            {
+              "name": "message_type",
+              "value": "outgoing"
+            },
+            {
+              "name": "private",
+              "value": "={{ false }}"
+            },
+            {
+              "name": "content_attributes",
+              "value": "={{ { \"is_bot\": true } }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "614a0dea-1af6-4f3b-b307-ada5c38bb8b3",
+      "name": "CW: Guardar Salida",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        -240,
+        64
+      ],
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Recuperar historial viejo y mensaje nuevo\nconst oldHistory = $('Leer Historial').first().json.history || [];\nconst msgData = $('Recibir Mensaje').first().json.body.entry[0].changes[0].value.messages[0];\nconst aiText = $('Vendedor (Claude)').first().json.content[0].text;\n\n// --- LÓGICA BLINDADA PARA LEER EL MENSAJE (ANTI-ERROR) ---\nlet userText = \"\";\n\nif (msgData.type === 'text') {\n    userText = msgData.text.body;\n} else if (msgData.type === 'button') {\n    userText = `[Botón: ${msgData.button.text}]`;\n} else if (msgData.type === 'interactive') {\n    // Para botones de lista o respuestas rápidas\n    if (msgData.interactive.button_reply) userText = `[Botón: ${msgData.interactive.button_reply.title}]`;\n    if (msgData.interactive.list_reply) userText = `[Lista: ${msgData.interactive.list_reply.title}]`;\n} else {\n    // Para imágenes, audios, stickers, etc.\n    userText = `[Archivo Multimedia: ${msgData.type}]`;\n}\n// ----------------------------------------------------------\n\nconst newMessages = [\n  { role: 'user', content: userText },\n  { role: 'assistant', content: aiText }\n];\n\n// RETORNAMOS EL HISTORIAL Y EL ID LIMPIO\n// Importante: Envolvemos todo en \"json\" para que el siguiente nodo lo lea\nreturn {\n  json: {\n    history: [...oldHistory, ...newMessages],\n    last_updated: new Date().toISOString(),\n    telefono_id: msgData.from \n  }\n};"
+      },
+      "id": "6636cd18-3d21-4dac-b443-e50c981755f8",
+      "name": "Preparar Historial",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -16,
+        64
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "operation": "upsert",
+        "projectId": "pre-captura-datos",
+        "collection": "conversaciones",
+        "updateKey": "telefono_id",
+        "columns": "history, last_updated"
+      },
+      "type": "n8n-nodes-base.googleFirebaseCloudFirestore",
+      "typeVersion": 1.1,
+      "position": [
+        208,
+        64
+      ],
+      "id": "df41719c-2f0e-41a2-8021-ff0e49964e9f",
+      "name": "Guardar Memoria",
+      "credentials": {
+        "googleApi": {
+          "id": "rdAOVKqnRBOzNnrH",
+          "name": "Google Service Account account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://chat.preuniversitarionewman.com/api/v1/accounts/1/conversations/{{ $node[\"DEFINIR CONTEXTO\"].json.conversation_id }}/toggle_status",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "api_access_token",
+              "value": "EP1u7VivBi85LWnc1X59Gyvq"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "status",
+              "value": "pending"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -2672,
+        64
+      ],
+      "id": "56f34875-93e6-40b5-b628-c854ec0020b3",
+      "name": "CW: Forzar Pending",
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "models/gemini-2.0-flash",
+          "mode": "list",
+          "cachedResultName": "models/gemini-2.0-flash"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "={{ \n  (() => {\n    const msg = $('Recibir Mensaje').first().json.body.entry[0].changes[0].value.messages[0];\n    \n    // 1. Si es TEXTO normal (Lo que ya tenías)\n    if (msg.type === 'text') return msg.text.body;\n    \n    // 2. Si es BOTÓN antiguo (Lo que ya tenías)\n    if (msg.type === 'button') return \"[Botón presionado: \" + msg.button.text + \"]\";\n    \n    // 3. NUEVO: Si es Botón de Lista o Respuesta Rápida (Interactive)\n    if (msg.type === 'interactive') {\n        if (msg.interactive.button_reply) return \"[Botón: \" + msg.interactive.button_reply.title + \"]\";\n        if (msg.interactive.list_reply) return \"[Lista: \" + msg.interactive.list_reply.title + \"]\";\n    }\n\n    // 4. NUEVO: Si es Imagen/Audio/Sticker (Evita que el bot se caiga)\n    return \"[El usuario envió multimedia: \" + msg.type + \" - No analizable]\";\n  })() \n}}"
+            }
+          ]
+        },
+        "options": {
+          "systemMessage": "=Eres el DIRECTOR COMERCIAL de Preuniversitario Newman en Quito-Ecuador, experto en PSICOLOGÍA y ESTRATEGIA. Tu misión es analizar el mensaje (texto o botón) y definir el cierre.\n\nTU OBJETIVO: Clasificar el mensaje para dictar la estrategia al vendedor.\n\n📚 CONTEXTO CAMPAÑAS (Origen del usuario):\n{{ JSON.stringify($('Leer Config Plantillas').all().map(i => i.json)) }}\n\n------------------------------------------------------------------\n🚨 REGLAS DE CLASIFICACIÓN (JERARQUÍA SEMÁNTICA) 🚨\n\nPRIORIDAD 1: ANÁLISIS DE BOTONES (REGLA GENERAL)\nAnaliza el significado del botón presionado y encasíllalo en uno de estos 3 grupos:\n\n🔴 GRUPO A: GANANCIA / DESEO (Venta Directa)\n- QUÉ ES: Botones donde el usuario acepta una oferta, pide un descuento, activa un beneficio o acepta un reto.\n- PROHIBIDO asignar 'intencion_compra' mayor a 50.\n- EJEMPLOS TÍPICOS: \"Activar mi Pase\", \"Quiero mi 50%\", \"Acepto el reto\", \"Sí, quiero la guía\", \"Inscribirme\".\n- Considera para 'estrategia':ESTO NO ES UNA VENTA CALIENTE AÚN. Es solo interés inicial. Felicita su decisión, valida el beneficio (descuento/guía). Persuade.\n- ACCIÓN JSON:\n  * tema_interes: \"general\" (o lo que aplique al contexto).\n  * sentimiento: \"Entusiasta\"\n\n🟡 GRUPO B: CURIOSIDAD / INFO (Interés Medio)\n- QUÉ ES: Botones donde pide ver horarios, métodos, hablar con asesor o pregunta cómo funciona.\n- EJEMPLOS TÍPICOS: \"Ver Horarios\", \"Ver Método\", \"Hablar con Profe\", \"¿Cómo funciona?\", \"Más info\".\n- ACCIÓN JSON:\n  * tema_interes: \"general\"\n  * sentimiento: \"Curiosidad\"\n  * estrategia: \"VENTA CONSULTIVA: Muestra los horarios/opciones disponibles y termina con una pregunta de elección.\"\n\n🔵 GRUPO C: TRÁMITE / SOPORTE / ERROR (El \"Bait\")\n- QUÉ ES: Botones donde el usuario intenta SOLUCIONAR un problema ficticio, confirmar una cita, reabrir un caso o validar sus datos, agendar test.\n- EJEMPLOS TÍPICOS: \"Confirmar turno\", \"Reabrir caso\", \"Reenviar ahora\", \"Sí, confirmar\", \"Todo en orden\", \"No es mi número\".\n- ACCIÓN JSON:\n  * tema_interes: \"general\"\n  * sentimiento: \"Neutro\"\n  * estrategia: \"TÉCNICA DE PUENTE: 1. Confirma cortésmente que la gestión administrativa (turno/error) ya quedó resuelta en sistema. 2. INMEDIATAMENTE cambia de tema preguntando por su preparación académica o carrera de interés. ¡NO AGENDES CITAS!\"\n\n------------------------------------------------------------------\nPRIORIDAD 2: GESTIÓN DE TIEMPOS Y PROCESOS (REGLA SEMÁNTICA)\nAnaliza si el usuario pide tiempo o menciona un proceso que requiere espera.\n\n⏳ GRUPO: \"SOLICITUD DE ESPERA / PAUSA\"\n- DETECTOR SEMÁNTICO: El usuario indica que NO puede decidir ahora porque:\n  1. Debe consultar con terceros (\"papás\", \"esposo\", \"almohada\").\n  2. Depende de un factor externo (\"esperando el correo de la USFQ\", \"me pagan a fin de mes\").\n  3. Necesita pensar (\"déjame ver\", \"te aviso\", \"luego te escribo\").\n- ACCIÓN JSON:\n  * sentimiento: \"Neutro\"\n  * estrategia: \"TÉCNICA DEL BUMERÁN: 1. Valida la razón de la espera (sea familia o burocracia). 2. NO dejes el final abierto ('avísame'). 3. CIERRA proponiendo tú el seguimiento: '¿Te parece si te escribo el [DÍA SUGERIDO] para ver si ya te respondieron/decidieron?'.\"\n  \n------------------------------------------------------------------\n\n💰 LÓGICA DE PRECIOS POR PRODUCTO (ACTUALIZADA):\n\nDETECTA EL INTERÉS DEL USUARIO Y APLICA EL PRECIO CORRESPONDIENTE:\n\nA. SI ES \"CURSO PRESENCIAL\" (Ingreso U. Públicas / General):\n   1. OFERTA BASE: $250 (Pago único - 50% OFF del real de $500).\n   2. PLAN FACILIDAD: 2 cuotas de $125 (Inicio + Enero).\n   3. NEGOCIACIÓN (Resistencia alta): $225.\n   4. HONOR (Abanderados/Escoltas): $200 (Pago único).\n   5. RESERVA CUPO: $50.\n\nB. SI ES \"CURSO VIRTUAL\" (Ingreso U. Públicas desde casa):\n   1. OFERTA BASE: $225 (Pago único - 50% OFF del real de $450).\n   2. HONOR: $200.\n   (Nota: En virtual prioriza el pago único, evita ofrecer cuotas a menos que sea crítico).\n\nC. SI ES \"CURSO USFQ\" (VIP / San Francisco):\n   1. PAGO CONTADO: $400 USD.\n   2. TARJETA CRÉDITO: $440 USD (Solo presencial en oficina).\n   (Nota: Este es un producto Premium. NO ofrezcas descuentos de $225 aquí).\n\n🚨 INSTRUCCIÓN PARA SALIDA 'check_precio':\n- Si detectas intención de compra, escribe el monto EXACTO según el producto identificado arriba (Ej: \"$225\" si es virtual, \"$400\" si es USFQ).\n- Si no logras identificar el producto específico, asume el estándar presencial ($250).\n\n🧠 ANÁLISIS DE ANSIEDAD (NUEVO):\nAdemás del DISC, analiza si el alumno muestra signos de 'Ansiedad de Examen' (miedo a fallar, estrés) o 'Miedo al Futuro'.\n- SI DETECTAS ANSIEDAD: En el campo 'estrategia', instruye explícitamente: \"Usa un tono protector/paternal (Arquetipo: Mentor) en lugar de vendedor agresivo. Valida su emoción primero.\"\n- SI NO DETECTAS ANSIEDAD: Mantén el tono comercial estándar según su perfil DISC.\n\n🚨 REGLA DE ORO - PAGOS:\nSi detectas ALTA INTENCIÓN DE COMPRA (pregunta cuentas, dónde deposito, cómo pago):\n- Tu instrucción en 'estrategia' DEBE SER: \"Cierra la venta y envía el LINK DE RECAUDACIÓN (https://wa.link/1jci0b) para asegurar el descuento.\"\n- Permite dar número de cuenta bancaria directo en el chat y comunicarse al link de recaudación.\n\n🚫 REGLA ANTI-FALSOS POSITIVOS (BOTONES):\nSi el mensaje del usuario comienza con \"[Botón presionado: ...]\" (Ej: \"Activar mi 50% OFF\", \"Ver horarios\"):\n- PROHIBIDO asignar 'intencion_compra' mayor a 50.\n\nEliminar clientes sin intención\n1.SI el usuario dice 'Ya estoy en otro curso', 'Ya me inscribí', 'No me interesa' o 'Solo quería saber': ASIGNA: \"intencion_compra\": 0 ASIGNA: \"estrategia\": \"DESPEDIDA AMABLE. Felicita y cierra el chat sin preguntas.\"\n\n🧠 DETECCIÓN DE ESTRATEGIA HÍBRIDA:\n1. SI EL USUARIO MENCIONA: \"2do de bachillerato\", \"beca usfq\", \"segundo curso\" o \"gratuidad usfq\".\n   -> ASIGNA \"tema_interes\": \"usfq_2do\"\n   -> ESTRATEGIA: \"Ofrece la asesoría gratuita paso a paso para la Beca 100%. No vendas el curso aún.\"\n\n2. SI EL USUARIO PIDE: \"referencias\", \"opiniones\", \"videos\", \"pruebas de que es bueno\", \"testimonios\".\n   -> ASIGNA \"tema_interes\": \"testimonios\"\n   -> ESTRATEGIA: \"Muestra empatía y presenta los casos de éxito.\"\n\n\nSALIDA JSON OBLIGATORIA (Sin markdown, solo el JSON puro):\n{\n  \"sentimiento\": \"Miedo\" | \"Curiosidad\" | \"Urgencia\" | \"Enojo\" | \"Neutro\",\n  \"intencion_compra\": 0-100,\n  \"perfil_disc\": \"D\" | \"I\" | \"S\" | \"C\",\n  \"tema_interes\": \"medicina\" | \"ingenieria\" | \"general\" | \"virtual\" | \"usfq\" | \"usfq_2do\" | \"testimonios\" | \"garantia\" | \"precio\",\n  \"origen_plantilla\": \"Identifica la campaña si aplica\",\n  \"estrategia\": \"Instrucción TÁCTICA de venta\",\n  \"tip_cierre\": \"Consejo psicológico corto\",\n  \"check_precio\": \"Monto exacto ($250, $225, $200, $400 o 'N/A')\"\n}",
+          "temperature": 0.4
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1,
+      "position": [
+        -1632,
+        64
+      ],
+      "id": "4cedd056-236d-4d77-af1c-37d2172ac9de",
+      "name": "Message a model",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "yw02fIyPq1YTlpoj",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ $json.intencion_compra }}",
+              "operation": "larger",
+              "value2": 85
+            }
+          ]
+        }
+      },
+      "id": "ad63a3f1-9d8c-4258-a270-3ef3afa24488",
+      "name": "🔥 Es Venta Caliente?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        -1104,
+        -176
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "send",
+        "phoneNumberId": "876220262248295",
+        "recipientPhoneNumber": "593983575530",
+        "textBody": "=🚨 *ALERTA DE CIERRE ({{ $json.intencion_compra }}%)* 🚨\n\n👤 *Leads:* {{ $('Buscar Lead').first().json.nombre || $('Recibir Mensaje').first().json.body.entry[0].changes[0].value.contacts[0].profile.name }}\n📱 *Link:* https://wa.me/{{ $('Recibir Mensaje').first().json.body.entry[0].changes[0].value.messages[0].from }}\n\n🧠 *Estrategia:* {{ $json.estrategia }}\n💡 *Tip:* {{ $json.tip_cierre }}\n\n⚠️ *Acción:* Entra a Chatwoot ya.",
+        "additionalFields": {}
+      },
+      "id": "4cdf279b-6b4c-4a3c-8791-4fc56d99719c",
+      "name": "🔔 Avisar al Dueño",
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1.1,
+      "position": [
+        -832,
+        -192
+      ],
+      "webhookId": "e5aafdf9-7b72-4671-b334-0f9744593444",
+      "credentials": {
+        "whatsAppApi": {
+          "id": "B3NzNO3QIVyitbFe",
+          "name": "WhatsApp account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v20.0/{{ $node[\"Recibir Mensaje\"].json.body.entry[0].changes[0].value.metadata.phone_number_id }}/messages",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "whatsAppApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"messaging_product\": \"whatsapp\",\n  \"status\": \"read\",\n  \"message_id\": \"{{ $node['Recibir Mensaje'].json.body.entry[0].changes[0].value.messages[0].id }}\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -4768,
+        -144
+      ],
+      "id": "54c2a4f9-897a-4a29-ae54-ce7e89579051",
+      "name": "✅ Marcar Visto",
+      "credentials": {
+        "whatsAppApi": {
+          "id": "B3NzNO3QIVyitbFe",
+          "name": "WhatsApp account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "948188aa-e943-4bfa-a8ac-c88983fdd2df",
+              "leftValue": "={{ $json.estrategia }}",
+              "rightValue": "BUMERÁN",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            },
+            {
+              "id": "d9833317-6ded-43c6-b148-0ba04fe10df6",
+              "leftValue": "={{ $json.estrategia }}",
+              "rightValue": "Gestión de Espera",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {
+          "ignoreCase": true
+        }
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -1040,
+        336
+      ],
+      "id": "fe22c040-9da6-4148-949b-d6de3dd18eab",
+      "name": "Bumeran?"
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "operation": "upsert",
+        "projectId": "pre-captura-datos",
+        "collection": "leads_feria_1",
+        "updateKey": "_id",
+        "columns": "estado_seguimiento, fecha_ultimo_contacto"
+      },
+      "type": "n8n-nodes-base.googleFirebaseCloudFirestore",
+      "typeVersion": 1.1,
+      "position": [
+        -528,
+        320
+      ],
+      "id": "ec81b21c-8bb9-491f-a12b-ee4c9d390aab",
+      "name": "Marcador Seguimiento",
+      "alwaysOutputData": false,
+      "credentials": {
+        "googleApi": {
+          "id": "rdAOVKqnRBOzNnrH",
+          "name": "Google Service Account account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "be5ac28d-6e3e-4a51-8291-0f794f5f5190",
+              "name": "estado_seguimiento",
+              "value": "pendiente",
+              "type": "string"
+            },
+            {
+              "id": "4cb43292-4dc0-46bb-889f-fb9e958eb433",
+              "name": "fecha_ultimo_contacto",
+              "value": "={{ new Date().toISOString() }}",
+              "type": "string"
+            },
+            {
+              "id": "0645342c-2895-49a3-a6dd-60bdf7c3a5ec",
+              "name": "_id",
+              "value": "={{ $('Buscar Lead').item.json._id }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -752,
+        320
+      ],
+      "id": "d7c9ab35-ca56-43e9-b6ba-00134eaf3350",
+      "name": "Campos Seguimiento"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Recibir Mensaje": {
+      "main": [
+        [
+          {
+            "node": "Es mensaje real?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Es mensaje real?": {
+      "main": [
+        [
+          {
+            "node": "CW: Buscar Contacto",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "✅ Marcar Visto",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CW: Buscar Contacto": {
+      "main": [
+        [
+          {
+            "node": "Existe Contacto?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Existe Contacto?": {
+      "main": [
+        [
+          {
+            "node": "Definir Contact ID",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "CW: Crear Contacto",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CW: Crear Contacto": {
+      "main": [
+        [
+          {
+            "node": "Definir Contact ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Definir Contact ID": {
+      "main": [
+        [
+          {
+            "node": "CW: Buscar Conv (Todas)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CW: Buscar Conv (Todas)": {
+      "main": [
+        [
+          {
+            "node": "Existe Conv?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Existe Conv?": {
+      "main": [
+        [
+          {
+            "node": "DEFINIR CONTEXTO",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "CW: Crear Conv",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CW: Crear Conv": {
+      "main": [
+        [
+          {
+            "node": "DEFINIR CONTEXTO",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DEFINIR CONTEXTO": {
+      "main": [
+        [
+          {
+            "node": "CW: Guardar Entrada",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CW: Guardar Entrada": {
+      "main": [
+        [
+          {
+            "node": "¿Control Humano?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Control Humano?": {
+      "main": [
+        [
+          {
+            "node": "CW: Forzar Pending",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar Lead": {
+      "main": [
+        [
+          {
+            "node": "Leer Historial",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Leer Historial": {
+      "main": [
+        [
+          {
+            "node": "Leer Config Plantillas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Leer Config Plantillas": {
+      "main": [
+        [
+          {
+            "node": "Aggregate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate": {
+      "main": [
+        [
+          {
+            "node": "Message a model",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parsear JSON": {
+      "main": [
+        [
+          {
+            "node": "Bibliotecario",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "🔥 Es Venta Caliente?",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Bumeran?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Bibliotecario": {
+      "main": [
+        [
+          {
+            "node": "Armar Contexto",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Armar Contexto": {
+      "main": [
+        [
+          {
+            "node": "Vendedor (Claude)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Vendedor (Claude)": {
+      "main": [
+        [
+          {
+            "node": "Responder WhatsApp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Responder WhatsApp": {
+      "main": [
+        [
+          {
+            "node": "CW: Guardar Salida",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CW: Guardar Salida": {
+      "main": [
+        [
+          {
+            "node": "Preparar Historial",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar Historial": {
+      "main": [
+        [
+          {
+            "node": "Guardar Memoria",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CW: Forzar Pending": {
+      "main": [
+        [
+          {
+            "node": "Buscar Lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Message a model": {
+      "main": [
+        [
+          {
+            "node": "Parsear JSON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🔥 Es Venta Caliente?": {
+      "main": [
+        [
+          {
+            "node": "🔔 Avisar al Dueño",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Bumeran?": {
+      "main": [
+        [
+          {
+            "node": "Campos Seguimiento",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Campos Seguimiento": {
+      "main": [
+        [
+          {
+            "node": "Marcador Seguimiento",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "812c8e07-376c-420d-84f5-b1fce0d62925",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "0ed17acb1ed863023a30c36953c08c506083257370caf3b5e13dfdc40d73246e"
+  },
+  "id": "JF9waoVHLfI6HJGQ",
+  "tags": []
+}
