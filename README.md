@@ -18,32 +18,29 @@ The ecosystem is built on a **Micro-Workflow Architecture** using **n8n** as the
 The system is composed of 4 synchronized workflows acting as independent services:
 
 ### 1. Core Agent (`sales_agent_workflow.json`)
-The central brain of the operation.
-* **Function:** Handles incoming messages, retrieves context (RAG) from Firestore, and uses Chain-of-Thought (CoT) prompting to decide the next best action.
-* **Key Logic:**
-    * **Intent Classification:** Distinguishes between "Hot Leads" (Purchase Intent > 85%) and general inquiries.
-    * **Dynamic RAG:** Pulls specific product data (Price, Curricula) based on user interest.
-    * **Personality Engine:** Switches between personas ("Santiago" vs "Sofía") based on user demographics.
+The central brain of the operation. Handles intent classification, RAG retrieval, and autonomous closing logic.
+
+![Core Agent Diagram](assets/diagram_core_agent.png)
 
 ### 2. Human Bridge Middleware (`chatwoot_bridge.json`)
-A bi-directional synchronization layer between WhatsApp and Chatwoot.
-* **Function:** Ensures smooth "Human Handoff".
-* **Logic:** Filters bot-generated messages (marked with 🤖) to prevent loops and manages conversation status (Open/Pending) based on agent availability.
+A bi-directional synchronization layer between WhatsApp and Chatwoot. It ensures smooth "Human Handoff" by filtering bot messages and managing conversation status.
+
+![Bridge Diagram](assets/diagram_human_bridge.png)
 
 ### 3. The Hunter - Retention Loop (`retention_loop_hunter.json`)
-An asynchronous state machine for lead recovery.
-* **Function:** Monitors the `leads` collection in Firestore.
-* **Logic:** Runs a CRON job daily at 10:00 AM. Identifies leads stuck in "Pending" state for 48-90 hours and triggers a hyper-personalized re-engagement message to revive the sale.
+An asynchronous state machine for lead recovery. It monitors the database for leads stuck in "Pending" state for 48h and triggers a re-engagement message.
+
+![Hunter Diagram](assets/diagram_retention_loop.png)
 
 ### 4. Campaign Batch Launcher (`campaign_batch_launcher.json`)
-A batch-processing workflow for mass outreach.
-* **Function:** Reads leads from Google Sheets and executes messaging campaigns.
-* **Engineering:** Implements `SplitInBatches` logic (chunks of 500) to respect Meta API rate limits and logs delivery status/errors back to the database in real-time.
+A batch-processing workflow for mass outreach. It reads leads from Sheets and executes messaging campaigns respecting Meta's API rate limits.
+
+![Launcher Diagram](assets/diagram_batch_launcher.png)
 
 ## 🚀 Key Technical Features
 
 * **State Management:** Unlike stateless LLM calls, this system maintains long-term memory of the user's journey in Firestore.
-* **Offline-First Data Sync:** Integrated with a custom Android Data Collection App (source in separate repo) to handle leads from physical trade fairs.
+* **Offline-First Data Sync:** Integrated with a custom Android Data Collection App to handle leads from physical trade fairs.
 * **Guardrails:** Includes strict prompt engineering to prevent hallucination and enforce business rules (e.g., "Never invent prices").
 
 ## 🛠 Deployment
