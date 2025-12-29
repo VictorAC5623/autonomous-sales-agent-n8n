@@ -51,3 +51,5 @@ A batch-processing workflow for mass outreach. It reads leads from Sheets and ex
 
 ---
 *Authored by **Victor Altamirano** - Physicist & AI Engineer*
+
+## © Copyright This project is intended for portfolio and educational demonstration purposes only. Commercial use, modification, or distribution of this source code without the author's explicit permission is prohibited.
