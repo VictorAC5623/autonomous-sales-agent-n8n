@@ -1,0 +1,152 @@
+{
+  "name": "📦 Cartero: Filtro por Marca de Agua",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "webhook-salida",
+        "options": {}
+      },
+      "id": "f61ddbfe-959e-4c70-b94a-b42fc2388338",
+      "name": "Webhook Chatwoot",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        -736,
+        128
+      ],
+      "webhookId": "9c559604-fb08-4f9e-9f18-437d6d8672e1"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.body.event }}",
+              "value2": "message_created"
+            },
+            {
+              "value1": "={{ $json.body.message_type }}",
+              "value2": "outgoing"
+            },
+            {
+              "value1": "={{ $json.body.content }}",
+              "operation": "notContains",
+              "value2": "🤖"
+            }
+          ],
+          "boolean": [
+            {
+              "value1": "={{ $json.body.private }}"
+            }
+          ]
+        }
+      },
+      "id": "777d40dd-fdbd-4648-b460-773d26807599",
+      "name": "Es humano? (Sin Robot)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        -512,
+        128
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "send",
+        "phoneNumberId": "=876220262248295",
+        "recipientPhoneNumber": "={{ $json.body.conversation.meta.sender.phone_number.replace('+', '') }}",
+        "textBody": "={{ $json.body.content }}",
+        "additionalFields": {}
+      },
+      "id": "58ae09f8-91e2-4888-9cb5-6445d48852a5",
+      "name": "Enviar a WhatsApp",
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1,
+      "position": [
+        -272,
+        48
+      ],
+      "webhookId": "48f178e8-568e-421a-b99e-f15cf4b0f591",
+      "credentials": {
+        "whatsAppApi": {
+          "id": "B3NzNO3QIVyitbFe",
+          "name": "WhatsApp account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://chat.preuniversitarionewman.com/api/v1/accounts/1/conversations/{{ $json.body.conversation.id }}/toggle_status",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "api_access_token",
+              "value": "YOUR_CHATWOOT_API_TOKEN"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "status",
+              "value": "open"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "f9a0493c-73e4-4082-8f85-076c4c1fc141",
+      "name": "Forzar OPEN",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        -48,
+        128
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook Chatwoot": {
+      "main": [
+        [
+          {
+            "node": "Es humano? (Sin Robot)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Es humano? (Sin Robot)": {
+      "main": [
+        [
+          {
+            "node": "Enviar a WhatsApp",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Forzar OPEN",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "a7c0f027-629e-4383-b100-3043208774de",
+  "meta": {
+    "instanceId": "0ed17acb1ed863023a30c36953c08c506083257370caf3b5e13dfdc40d73246e"
+  },
+  "id": "ztZv1vvLvqWSL0Uy",
+  "tags": []
+}

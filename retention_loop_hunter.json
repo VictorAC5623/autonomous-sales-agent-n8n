@@ -1,0 +1,215 @@
+{
+  "name": "El Cazador",
+  "nodes": [
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "be5ac28d-6e3e-4a51-8291-0f794f5f5190",
+              "name": "estado_seguimiento",
+              "value": "completado",
+              "type": "string"
+            },
+            {
+              "id": "4cb43292-4dc0-46bb-889f-fb9e958eb433",
+              "name": "fecha_ultimo_contacto",
+              "value": "={{ new Date().toISOString() }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -32,
+        -16
+      ],
+      "id": "9c042cee-35dd-4f7b-8c6a-9a4211ad601a",
+      "name": "Campos Completado"
+    },
+    {
+      "parameters": {
+        "jsCode": "// El nodo anterior YA filtró por \"pendiente\". \n// Aquí solo filtramos por TIEMPO (48h - 90h).\n\nconst leads = items.map(item => item.json);\nconst leadsParaDisparar = [];\nconst ahora = new Date();\n\nfor (const lead of leads) {\n  if (lead.fecha_ultimo_contacto) {\n    const fechaUltimo = new Date(lead.fecha_ultimo_contacto);\n    // Diferencia en horas\n    const diferenciaHoras = Math.abs(ahora - fechaUltimo) / 36e5;\n\n    // REGLA: Que hayan pasado entre 40 y 90 horas (aprox 2 a 4 días)\n    if (diferenciaHoras > 40 && diferenciaHoras < 90) {\n       leadsParaDisparar.push({ json: lead });\n    }\n  }\n}\n\nreturn leadsParaDisparar;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -416,
+        -16
+      ],
+      "id": "fd7cdff7-12b2-4d7c-a587-bba041fa9167",
+      "name": "Filtro 48 Horas"
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "operation": "upsert",
+        "projectId": "pre-captura-datos",
+        "collection": "leads_feria_1",
+        "updateKey": "={{ $('Filtro 48 Horas').item.json.id }}",
+        "columns": "estado_seguimiento, fecha_ultimo_contacto"
+      },
+      "type": "n8n-nodes-base.googleFirebaseCloudFirestore",
+      "typeVersion": 1.1,
+      "position": [
+        192,
+        -16
+      ],
+      "id": "3516ad08-b148-4cf4-9474-27c7d5ddd95d",
+      "name": "Actualizar a Completado",
+      "credentials": {
+        "googleApi": {
+          "id": "rdAOVKqnRBOzNnrH",
+          "name": "Google Service Account account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "phoneNumberId": "=876220262248295",
+        "recipientPhoneNumber": "={{ $json._id }}",
+        "template": "estado_solicitud_pendiente|es",
+        "components": {
+          "component": [
+            {
+              "bodyParameters": {
+                "parameter": [
+                  {
+                    "text": "={{ $json.nombre || 'Futuro Politécnico' }}"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1.1,
+      "position": [
+        -224,
+        -16
+      ],
+      "id": "50e58dc4-9afc-4e19-93a3-f9ef0a6acc92",
+      "name": "Enviar",
+      "webhookId": "1f850e4b-1e1b-4f71-bf3f-19115ab19eb8",
+      "credentials": {
+        "whatsAppApi": {
+          "id": "B3NzNO3QIVyitbFe",
+          "name": "WhatsApp account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "operation": "query",
+        "projectId": "pre-captura-datos",
+        "query": "={\n  \"structuredQuery\": {\n    \"from\": [\n      {\n        \"collectionId\": \"leads_feria_1\"\n      }\n    ],\n    \"where\": {\n      \"fieldFilter\": {\n        \"field\": {\n          \"fieldPath\": \"estado_seguimiento\"\n        },\n        \"op\": \"EQUAL\",\n        \"value\": {\n          \"stringValue\": \"pendiente\"\n        }\n      }\n    },\n    \"limit\": 100\n  }\n}"
+      },
+      "type": "n8n-nodes-base.googleFirebaseCloudFirestore",
+      "typeVersion": 1.1,
+      "position": [
+        -640,
+        -16
+      ],
+      "id": "d913016c-b72c-45c4-a592-f9b2917899a0",
+      "name": "Get All",
+      "credentials": {
+        "googleApi": {
+          "id": "rdAOVKqnRBOzNnrH",
+          "name": "Google Service Account account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 10
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -816,
+        -16
+      ],
+      "id": "4c3398d9-033a-4ff0-95b2-276960342a52",
+      "name": "Schedule"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Campos Completado": {
+      "main": [
+        [
+          {
+            "node": "Actualizar a Completado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filtro 48 Horas": {
+      "main": [
+        [
+          {
+            "node": "Enviar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enviar": {
+      "main": [
+        [
+          {
+            "node": "Campos Completado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get All": {
+      "main": [
+        [
+          {
+            "node": "Filtro 48 Horas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule": {
+      "main": [
+        [
+          {
+            "node": "Get All",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "96e77219-4318-4cf6-9c24-d13707215deb",
+  "meta": {
+    "instanceId": "0ed17acb1ed863023a30c36953c08c506083257370caf3b5e13dfdc40d73246e"
+  },
+  "id": "DM1q1p0iKWrz62hA",
+  "tags": []
+}

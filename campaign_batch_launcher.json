@@ -1,0 +1,928 @@
+{
+  "name": "🚀 LANZADOR NEWMAN",
+  "nodes": [
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "77a32284-c683-4e13-ad6f-1283a4e0c124",
+      "name": "📦 Lotes de 10",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        -1616,
+        720
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_SHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Reporte_env",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "telefono": "={{ $('📦 Lotes de 10').item.json.telefono }}",
+            "nombre": "={{ $('📦 Lotes de 10').item.json.nombre }}",
+            "error": "Fallo Envio",
+            "fecha": "={{ new Date().toISOString() }}",
+            "plantilla": "={{ $('🧠 Preparar Payload').item.json.template_to_send }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "telefono",
+              "displayName": "telefono",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "nombre",
+              "displayName": "nombre",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "error",
+              "displayName": "error",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "fecha",
+              "displayName": "fecha",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "plantilla",
+              "displayName": "plantilla",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "f8392aa0-3831-48fd-8e9e-862280143544",
+      "name": "📝 Log Error (Sheets)",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        176,
+        880
+      ],
+      "credentials": {
+        "googleApi": {
+          "id": "rdAOVKqnRBOzNnrH",
+          "name": "Google Service Account account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// CEREBRO: MODO SEGURO (Lotes de 500)\n// ===================================\n\nconst loteSeguro = 500; // Bajamos a 500 para no tener ejecuciones de 2 horas\n\nreturn {\n  limitEnvios: loteSeguro,\n  dia_actual: \"remanente\",\n  debug_info: `Modo limpieza: Procesando lote de ${loteSeguro} leads con delay de 5s.`\n};"
+      },
+      "id": "fd3f71a8-6df8-45dc-b07c-fc8b8bf1f2ec",
+      "name": "Cerebro (Lógica Final)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2128,
+        784
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "operation": "query",
+        "projectId": "pre-captura-datos",
+        "query": "={\n  \"structuredQuery\": {\n    \"from\": [\n      {\n        \"collectionId\": \"leads_feria_1\"\n      }\n    ],\n    \"where\": {\n      \"fieldFilter\": {\n        \"field\": {\n          \"fieldPath\": \"status\"\n        },\n        \"op\": \"EQUAL\",\n        \"value\": {\n          \"stringValue\": \"nuevo\"\n        }\n      }\n    },\n    \"orderBy\": [\n      {\n        \"field\": {\n          \"fieldPath\": \"prioridad\"\n        },\n        \"direction\": \"ASCENDING\"\n      }\n    ],\n    \"limit\": {{ $node['Cerebro (Lógica Final)'].json.limitEnvios }}\n  }\n}"
+      },
+      "type": "n8n-nodes-base.googleFirebaseCloudFirestore",
+      "typeVersion": 1.1,
+      "position": [
+        -1936,
+        784
+      ],
+      "id": "850995f7-7ab4-402b-ac8c-1c3181db7dfe",
+      "name": "Buscar Leads (Prioridad)",
+      "credentials": {
+        "googleApi": {
+          "id": "rdAOVKqnRBOzNnrH",
+          "name": "Google Service Account account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "operation": "upsert",
+        "projectId": "pre-captura-datos",
+        "collection": "leads_feria_1",
+        "updateKey": "_id",
+        "columns": "status, meta_status, template_usado, ultimo_envio"
+      },
+      "type": "n8n-nodes-base.googleFirebaseCloudFirestore",
+      "typeVersion": 1.1,
+      "position": [
+        464,
+        1040
+      ],
+      "id": "6c8897fe-c237-43e9-bd9e-9d396ce03044",
+      "name": "Update DB (Fallo)",
+      "credentials": {
+        "googleApi": {
+          "id": "rdAOVKqnRBOzNnrH",
+          "name": "Google Service Account account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "c48f344c-b64a-4582-8e9c-3351431a257c",
+              "name": "status",
+              "value": "contactado",
+              "type": "string"
+            },
+            {
+              "id": "6e3e16c9-1cef-45aa-97e0-f1d4859c4fc5",
+              "name": "meta_status",
+              "value": "sent",
+              "type": "string"
+            },
+            {
+              "id": "ca9854f7-d2e5-4aa9-8d12-55088366fb1e",
+              "name": "template_usado",
+              "value": "={{ $('🧠 Preparar Payload').item.json.template_to_send }}",
+              "type": "string"
+            },
+            {
+              "id": "2ae3511f-336f-49ff-a8a4-0a721d2c68cc",
+              "name": "ultimo_envio",
+              "value": "={{ new Date().toISOString() }}",
+              "type": "string"
+            },
+            {
+              "id": "e38387a1-1c5d-4c57-8322-72aff512132d",
+              "name": "_id",
+              "value": "={{ $('Buscar Leads (Prioridad)').item.json._id }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        192,
+        528
+      ],
+      "id": "512f3ed6-a742-4386-bc64-e012efcc0729",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "operation": "upsert",
+        "projectId": "pre-captura-datos",
+        "collection": "leads_feria_1",
+        "updateKey": "=_id",
+        "columns": "status, meta_status, template_usado, ultimo_envio"
+      },
+      "type": "n8n-nodes-base.googleFirebaseCloudFirestore",
+      "typeVersion": 1.1,
+      "position": [
+        352,
+        640
+      ],
+      "id": "f33d75d0-b306-4a2a-ac99-d135ccf1e0ff",
+      "name": "Create or update a document",
+      "credentials": {
+        "googleApi": {
+          "id": "rdAOVKqnRBOzNnrH",
+          "name": "Google Service Account account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "c48f344c-b64a-4582-8e9c-3351431a257c",
+              "name": "status",
+              "value": "fallido",
+              "type": "string"
+            },
+            {
+              "id": "6e3e16c9-1cef-45aa-97e0-f1d4859c4fc5",
+              "name": "meta_status",
+              "value": "failed",
+              "type": "string"
+            },
+            {
+              "id": "ca9854f7-d2e5-4aa9-8d12-55088366fb1e",
+              "name": "template_usado",
+              "value": "={{ $('🧠 Preparar Payload').item.json.template_to_send }}",
+              "type": "string"
+            },
+            {
+              "id": "2ae3511f-336f-49ff-a8a4-0a721d2c68cc",
+              "name": "ultimo_envio",
+              "value": "={{ new Date().toISOString() }}",
+              "type": "string"
+            },
+            {
+              "id": "f6e5a48f-c533-4d76-add8-cf9c24a52b76",
+              "name": "_id",
+              "value": "={{ $('Buscar Leads (Prioridad)').item.json._id }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        416,
+        864
+      ],
+      "id": "89a24099-263b-4a83-9a8d-1a3200e6bef2",
+      "name": "Edit Fields1"
+    },
+    {
+      "parameters": {
+        "triggerTimes": {
+          "item": [
+            {
+              "hour": 9
+            },
+            {
+              "hour": 17
+            }
+          ]
+        }
+      },
+      "id": "b2e47a80-95c8-430c-81ff-57ae42d26255",
+      "name": "🕐 Scheduler (8am)",
+      "type": "n8n-nodes-base.cron",
+      "typeVersion": 1,
+      "position": [
+        -2352,
+        784
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://graph.facebook.com/v21.0/876220262248295/messages",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "whatsAppApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $node[\"🧠 Preparar Payload\"].json.whatsapp_payload }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -80,
+        512
+      ],
+      "id": "0b49772a-03f0-4e8a-8e06-ea31c49d87d6",
+      "name": "HTTP Request",
+      "credentials": {
+        "whatsAppApi": {
+          "id": "B3NzNO3QIVyitbFe",
+          "name": "WhatsApp account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "amount": "={{3}}",
+        "unit": "seconds"
+      },
+      "id": "2e94c293-8c3e-4e88-8217-738b4f2861f0",
+      "name": "⏳ Espera Humana",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1,
+      "position": [
+        -272,
+        384
+      ],
+      "webhookId": "0ad1474a-38a8-4343-933b-fa29d6162270"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://chat.preuniversitarionewman.com/api/v1/accounts/1/conversations/{{ $('⏳ Espera Humana').item.json.id }}/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "api_access_token",
+              "value": "YOUR_CHATWOOT_TOKEN"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "content",
+              "value": "=🤖 [BOT INICIÓ CONVERSACIÓN]\nPlantilla enviada: {{ $('🧠 Preparar Payload').item.json.template_to_send }}"
+            },
+            {
+              "name": "message_type",
+              "value": "outgoing"
+            },
+            {
+              "name": "private",
+              "value": "false"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        176,
+        320
+      ],
+      "id": "c1a6aa29-684d-4b66-b5fa-00ecadd91c70",
+      "name": "CW: Reflejar en Chat",
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "url": "https://chat.preuniversitarionewman.com/api/v1/accounts/1/contacts/search",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "q",
+              "value": "={{ $('📦 Lotes de 10').item.json.telefono.toString().replace('+', '') }}"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "api_access_token",
+              "value": "YOUR_CHATWOOT_TOKEN"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "868258ba-2ea3-4ac6-b86a-327e54a6b777",
+      "name": "CW: Buscar (V5)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -1168,
+        208
+      ],
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ $json.payload.length }}",
+              "operation": "larger"
+            }
+          ]
+        }
+      },
+      "id": "c37a3c96-811d-4e9f-8da0-9d8f733a863a",
+      "name": "¿Existe?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        -960,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://chat.preuniversitarionewman.com/api/v1/accounts/1/conversations",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "api_access_token",
+              "value": "YOUR_CHATWOOT_TOKEN"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "contact_id",
+              "value": "={{ $json.payload[0].id }}"
+            },
+            {
+              "name": "inbox_id",
+              "value": "4"
+            },
+            {
+              "name": "status",
+              "value": "pending"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "10b73d10-a095-439a-97f1-38c718ca0514",
+      "name": "Caja (Existente)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        -640,
+        64
+      ],
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://chat.preuniversitarionewman.com/api/v1/accounts/1/contacts",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "api_access_token",
+              "value": "YOUR_CHATWOOT_TOKEN"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "inbox_id",
+              "value": "4"
+            },
+            {
+              "name": "name",
+              "value": "={{ $('📦 Lotes de 10').item.json.nombre }}"
+            },
+            {
+              "name": "phone_number",
+              "value": "={{ '+' + $('🧠 Preparar Payload').item.json.telefono }}"
+            },
+            {
+              "name": "identifier",
+              "value": "={{ $('🧠 Preparar Payload').item.json.telefono }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "b34d3e01-9a60-43f3-bbaa-62244b6e3ee9",
+      "name": "CW: Crear (Nuevo)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        -736,
+        368
+      ],
+      "retryOnFail": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://chat.preuniversitarionewman.com/api/v1/accounts/1/conversations",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "api_access_token",
+              "value": "YOUR_CHATWOOT_TOKEN"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "contact_id",
+              "value": "={{ $json.payload.contact.id }}"
+            },
+            {
+              "name": "inbox_id",
+              "value": "4"
+            },
+            {
+              "name": "status",
+              "value": "pending"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "f873bb70-1855-4654-8b5f-f4b6b5c70650",
+      "name": "Caja (Nuevo)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        -544,
+        368
+      ],
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_SHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "=Enviados",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "telefono": "={{ $('🧠 Preparar Payload').item.json.telefono }}",
+            "nombre": "={{ $('📦 Lotes de 10').item.json.nombre }}",
+            "estado": "Enviado OK",
+            "plantilla": "={{ $('🧠 Preparar Payload').item.json.template_to_send }}",
+            "fecha": "={{ new Date().toLocaleString('es-EC', { timeZone: 'America/Guayaquil' }) }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "telefono",
+              "displayName": "telefono",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "nombre",
+              "displayName": "nombre",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "estado",
+              "displayName": "estado",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "plantilla",
+              "displayName": "plantilla",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "fecha",
+              "displayName": "fecha",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "position": [
+        400,
+        320
+      ],
+      "id": "5f256993-b3c6-4ba8-9ca6-34774f63011b",
+      "name": "📝 Log Enviados",
+      "credentials": {
+        "googleApi": {
+          "id": "rdAOVKqnRBOzNnrH",
+          "name": "Google Service Account account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// 1. OBTENER DATOS\nconst data = $input.item.json;\nconst nombre = data.nombre || \"Estudiante\";\n\n// Limpiamos el teléfono (quitamos letras o símbolos, solo números)\nconst telefonoSucio = String(data.telefono || \"\").replace(/\\D/g, ''); \n\n// --- 🔧 CORRECCIÓN INTELIGENTE DE TELÉFONO (REGEX) ---\nlet telefonoFinal = telefonoSucio;\n\n// Patrón: Busca un '9' seguido de 8 dígitos exactos (Ej: 998381600) en cualquier parte.\n// Ignora si tiene 593 o 0 antes.\nconst match = telefonoSucio.match(/(?:593|0)?(9\\d{8})/);\n\nif (match) {\n    // ¡Encontramos un celular válido escondido!\n    // match[1] es el número limpio que empieza con 9\n    telefonoFinal = \"593\" + match[1];\n} else {\n    // FALLBACK: Si no encontramos un celular, pero empieza con 593 y es larguísimo (más de 12),\n    // cortamos el exceso del final para intentar salvarlo.\n    if (telefonoSucio.startsWith(\"593\") && telefonoSucio.length > 12) {\n        telefonoFinal = telefonoSucio.substring(0, 12);\n    }\n}\n\n// OBTENEMOS LA PRIORIDAD\nconst prioridad = parseInt(data.prioridad) || 0; \n\n// ==========================================\n// 2. CATÁLOGO DE PLANTILLAS\n// ==========================================\nconst catalogoPlantillas = {\n  // --- 🔥 USFQ 2DO BACHILLERATO (Prioridad 5 y 6) ---\n  \"promo_usfq_2do_bach_v2\": {\n      image: \"https://preuniversitarionewman.com/plantillas/promo_usfq_2do_bach_v2.jpg\" \n  },\n\n  // --- RESTO DEL CATÁLOGO (Marketing General) ---\n  \"promo_estrategia_elite_v2\": { \n      image: \"https://preuniversitarionewman.com/plantillas/promo_estrategia_elite_v2.jpg\"\n  },\n  \"promo_ingreso_universidad_v1\": { \n      image: \"https://www.preuniversitarionewman.com/plantillas/promo_ingreso_universidad_v1.jpg\"\n  },\n  \"marketing_pase_vip_feria\": { \n      image: \"https://www.preuniversitarionewman.com/plantillas/marketing_pase_vip_feria.png\"\n  },\n  \"marketing_reto_futuro_u\": { \n      image: \"https://www.preuniversitarionewman.com/plantillas/marketing_reto_futuro_u.png\"\n  },\n\n  // --- UTILIDAD / TEXTO (Sin imagen) ---\n  \"error_entrega_cronograma\": { image: null },\n  \"verificacion_contacto_feria\": { image: null },\n  \"reporte_atencion_inconclusa\": { image: null }\n};\n\n// ==========================================\n// 3. LÓGICA DE SELECCIÓN INTELIGENTE 🧠\n// ==========================================\nlet templateKey = \"\";\n\n// 🚨 REGLA DE ORO: Si es Prioridad 5 o 6 -> USFQ OBLIGATORIO\nif (prioridad === 5 || prioridad === 6) {\n    templateKey = \"promo_usfq_2do_bach_v2\";\n\n} else {\n    // PARA EL RESTO: Lógica Aleatoria\n    const keysUtilidad = [\n        \"reporte_atencion_inconclusa\", \n        \"verificacion_contacto_feria\", \n        \"error_entrega_cronograma\"\n    ];\n    const keysMarketing = [\n        \"marketing_reto_futuro_u\", \n        \"marketing_pase_vip_feria\", \n        \"promo_ingreso_universidad_v1\", \n        \"promo_estrategia_elite_v2\"\n    ];\n\n    const azar = Math.random(); \n    if (azar < 0.60) {\n      const index = Math.floor(Math.random() * keysUtilidad.length);\n      templateKey = keysUtilidad[index];\n    } else {\n      const index = Math.floor(Math.random() * keysMarketing.length);\n      templateKey = keysMarketing[index];\n    }\n}\n\nconst config = catalogoPlantillas[templateKey] || { image: null };\n\n// 4. CONSTRUIR LOS COMPONENTES\nlet components = [];\n\nif (config.image !== null) {\n    components.push({\n      \"type\": \"header\",\n      \"parameters\": [\n        {\n          \"type\": \"image\",\n          \"image\": { \"link\": config.image }\n        }\n      ]\n    });\n}\n\ncomponents.push({\n  \"type\": \"body\",\n  \"parameters\": [\n    {\n      \"type\": \"text\",\n      \"parameter_name\": \"nombre\", \n      \"text\": nombre\n    }\n  ]\n});\n\n// 5. RETORNAR EL PAYLOAD LISTO\nreturn {\n  nombre: nombre,\n  telefono: telefonoFinal,\n  template_to_send: templateKey,\n  prioridad_detectada: prioridad,\n  \n  whatsapp_payload: {\n    \"messaging_product\": \"whatsapp\",\n    \"recipient_type\": \"individual\",\n    \"to\": telefonoFinal,\n    \"type\": \"template\",\n    \"template\": {\n      \"name\": templateKey,\n      \"language\": { \"code\": \"es\" },\n      \"components\": components\n    }\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1328,
+        464
+      ],
+      "id": "9611727c-a577-42e8-8f52-9a8b4b9fdc2f",
+      "name": "🧠 Preparar Payload"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "📦 Lotes de 10": {
+      "main": [
+        [],
+        [
+          {
+            "node": "🧠 Preparar Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "📝 Log Error (Sheets)": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cerebro (Lógica Final)": {
+      "main": [
+        [
+          {
+            "node": "Buscar Leads (Prioridad)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar Leads (Prioridad)": {
+      "main": [
+        [
+          {
+            "node": "📦 Lotes de 10",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update DB (Fallo)": {
+      "main": [
+        [
+          {
+            "node": "📦 Lotes de 10",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "Create or update a document",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create or update a document": {
+      "main": [
+        [
+          {
+            "node": "📦 Lotes de 10",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields1": {
+      "main": [
+        [
+          {
+            "node": "Update DB (Fallo)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🕐 Scheduler (8am)": {
+      "main": [
+        [
+          {
+            "node": "Cerebro (Lógica Final)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "CW: Reflejar en Chat",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "📝 Log Error (Sheets)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "⏳ Espera Humana": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CW: Reflejar en Chat": {
+      "main": [
+        [
+          {
+            "node": "📝 Log Enviados",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CW: Buscar (V5)": {
+      "main": [
+        [
+          {
+            "node": "¿Existe?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Existe?": {
+      "main": [
+        [
+          {
+            "node": "Caja (Existente)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "CW: Crear (Nuevo)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CW: Crear (Nuevo)": {
+      "main": [
+        [
+          {
+            "node": "Caja (Nuevo)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Caja (Nuevo)": {
+      "main": [
+        [
+          {
+            "node": "⏳ Espera Humana",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Caja (Existente)": {
+      "main": [
+        [
+          {
+            "node": "⏳ Espera Humana",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🧠 Preparar Payload": {
+      "main": [
+        [
+          {
+            "node": "CW: Buscar (V5)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "e92643d3-b3ec-4600-a317-f816c1bea386",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "0ed17acb1ed863023a30c36953c08c506083257370caf3b5e13dfdc40d73246e"
+  },
+  "id": "jhKUXFB032df3urQ",
+  "tags": []
+}
